@@ -120,6 +120,38 @@ python svg_render.py x=diffvg target='./data/fallingwater.png'
 python svg_render.py x=diffvg target='./data/fallingwater.png' x.num_paths=512 x.num_iter=2000
 ```
 
+**DiffVG Tile** – tiled vectorization for high-resolution images (e.g. 4096×4096):
+
+Splits the input into overlapping tiles, optimises each tile independently, and
+assembles all tiles into a **single SVG** with `<g transform="translate(x,y)">` groups.
+
+```shell
+# minimal run on any image (uses 512×512 tiles with 64 px overlap)
+python svg_render.py x=diffvg_tile target='./data/fallingwater.png'
+
+# recommended settings for a 4096×4096 source image
+python svg_render.py x=diffvg_tile target='./data/photo_4k.png' \
+    x.tile_size=512 x.overlap=64 x.batch_size=4 \
+    x.num_paths=128 x.num_iter=500
+
+# larger tiles with more paths for higher fidelity
+python svg_render.py x=diffvg_tile target='./data/photo_4k.png' \
+    x.tile_size=1024 x.overlap=128 x.batch_size=2 \
+    x.num_paths=256 x.num_iter=1000 x.loss_type='l2+lpips'
+```
+
+Key parameters:
+
+| Parameter | Default | Description |
+|-----------|---------|-------------|
+| `x.tile_size` | 512 | Width/height of each tile (px). 512 or 1024 recommended for 4K images. |
+| `x.overlap` | 64 | Overlap between adjacent tiles (px). Use ≥ 64 to reduce seam artefacts. |
+| `x.batch_size` | 4 | Tiles processed per micro-batch step. Higher = more GPU memory, but amortises overhead. |
+| `x.feather` | 32 | Blending ramp width at tile edges (px). Set to 0 to disable. |
+| `x.num_paths` | 128 | Number of DiffVG paths per tile. |
+| `x.num_iter` | 500 | Optimisation iterations per tile. |
+| `x.loss_type` | `l2` | Loss: `l1`, `l2`, `lpips`, or `l2+lpips`. |
+
 **LIVE** vectorizes the raster emojis images (in original PNG format):
 
 ```shell
