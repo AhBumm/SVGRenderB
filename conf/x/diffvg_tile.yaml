@@ -1,0 +1,69 @@
+# conf/x/diffvg_tile.yaml
+# -----------------------------------------------------------------------
+# DiffVGTile – tiled image-to-SVG vectorisation configuration
+# -----------------------------------------------------------------------
+# Quickstart (512×512 input):
+#   python svg_render.py x=diffvg_tile target='./data/fallingwater.png'
+#
+# High-resolution (4096×4096) recommended command:
+#   python svg_render.py x=diffvg_tile \
+#     target='./data/big_image.png' \
+#     x.tile_size=512 x.overlap=64 x.num_paths=128 \
+#     x.num_iter=1000 x.batch_size=4
+# -----------------------------------------------------------------------
+
+method: 'diffvg_tile'
+
+# -----------------------------------------------------------------------
+# Tiling parameters
+# -----------------------------------------------------------------------
+# tile_size: each tile is rendered as a (tile_size × tile_size) canvas.
+#   Larger tiles capture more context but require more GPU memory.
+tile_size: 512
+
+# overlap: pixels of overlap between adjacent tiles.
+#   A larger overlap smooths seams but increases total computation.
+overlap: 64
+
+# -----------------------------------------------------------------------
+# Optimisation
+# -----------------------------------------------------------------------
+num_iter: 1000
+
+# batch_size: number of tiles processed per optimisation step.
+#
+#   Semantics: at each step, `batch_size` tiles are rendered sequentially;
+#   their losses are averaged and a *single* backward pass is performed,
+#   then each tile's own Adam optimizer is stepped.
+#
+#   Trade-off:
+#     - batch_size=1  → least GPU memory, slowest wall-clock per epoch
+#     - batch_size=4  → moderate; good default for 16 GB VRAM
+#     - batch_size=8+ → fastest but may OOM on large tiles
+#
+#   Note: pydiffvg does not support true parallel batch rendering; the
+#   loop over `batch_size` tiles is sequential in Python but shares a
+#   single backward graph.
+batch_size: 4
+
+lr_base:
+  point: 1.0
+  color: 0.01
+  stroke_width: 0.1
+  stroke_color: 0.01
+lr_schedule: False
+
+# -----------------------------------------------------------------------
+# SVG path attributes
+# -----------------------------------------------------------------------
+num_paths: 64       # paths per tile (reduce for coarser / faster output)
+max_width: 5.0
+path_type: 'unclosed'   # or 'closed'
+
+# -----------------------------------------------------------------------
+# Loss
+# -----------------------------------------------------------------------
+loss_type: 'l2'     # choices: l1 | l2 | lpips | l2+lpips
+
+perceptual:
+  lpips_net: 'vgg'  # used only when loss_type contains 'lpips'

@@ -89,13 +89,71 @@
 To quickly get started with **PyTorch-SVGRender**, follow the steps below.  
 These instructions will help you run **quick inference locally**.
 
-#### 🚀 **Option 1: Standard Installation**
+#### 🚀 **Option 1: Standard Installation (Python 3.10 + PyTorch 2.8 + CUDA 12.8)**
 
-Run the following command in the **top-level directory**:
+> **Recommended environment:** Python 3.10, PyTorch 2.8, CUDA 12.8
+
+**Step 1 – Install PyTorch 2.8 (cu128 wheels):**
+
+```shell
+pip install torch torchvision torchaudio \
+    --index-url https://download.pytorch.org/whl/cu128
+```
+
+**Step 2 – Install base dependencies:**
+
+```shell
+pip install -r requirements.txt
+```
+
+Or install the package directly:
+
+```shell
+pip install .
+```
+
+**Step 3 (optional) – Install xformers** (accelerates Stable Diffusion pipelines):
+
+```shell
+pip install xformers
+```
+
+> ⚠️ `xformers` must match the installed `torch` version. If a compatible wheel is not available, skip this step — the pipelines will still work without it.
+
+**Step 4 (optional) – Install DiffVG** (required for `diffvg` and `diffvg_tile` methods):
+
+DiffVG must be compiled from source. You need `cmake`, `ninja`, and CUDA toolkit headers matching your driver.
+
+```shell
+# System build tools (Ubuntu/Debian)
+sudo apt-get install -y cmake build-essential
+
+# Clone and build
+git clone https://github.com/BachiLi/diffvg.git
+cd diffvg
+git submodule update --init --recursive
+pip install .
+cd ..
+```
+
+**Common diffvg build errors:**
+
+| Error | Fix |
+|---|---|
+| `nvcc: command not found` | Install `cuda-toolkit` matching your driver |
+| `CMake Error: CUDA not found` | Ensure `CUDA_HOME` or `CUDA_PATH` is set |
+| ABI mismatch with torch | Re-build after reinstalling matching torch |
+
+Run the automated install script (installs all steps including diffvg):
 
 ```shell
 chmod +x script/install.sh
+# Base only:
 bash script/install.sh
+# Base + diffvg:
+INSTALL_DIFFVG=1 bash script/install.sh
+# Base + xformers:
+INSTALL_XFORMERS=1 bash script/install.sh
 ```
 
 #### 🐳 Option 2: Using Docker
@@ -119,6 +177,26 @@ python svg_render.py x=diffvg target='./data/fallingwater.png'
 # change 'num_paths' and 'num_iter' for better results
 python svg_render.py x=diffvg target='./data/fallingwater.png' x.num_paths=512 x.num_iter=2000
 ```
+
+**DiffVG Tile** vectorizes high-resolution images by splitting them into overlapping tiles:
+
+> Requires pydiffvg — see [installation instructions](#️-installation) above.
+
+```shell
+# Small image (quick sanity check)
+python svg_render.py x=diffvg_tile target='./data/fallingwater.png' \
+    x.tile_size=256 x.overlap=32 x.num_paths=32 x.num_iter=200 x.batch_size=1
+
+# 4096×4096 image (recommended settings, ~16 GB VRAM)
+python svg_render.py x=diffvg_tile target='./data/big_image.png' \
+    x.tile_size=512 x.overlap=64 x.num_paths=128 \
+    x.num_iter=1000 x.batch_size=4
+```
+
+> **`batch_size` explained:** at each step, `batch_size` tiles are rendered sequentially,
+> their losses are averaged, and a single `backward()` is called. Each tile's own Adam
+> optimizer is then stepped. A larger `batch_size` smooths gradient updates across tiles
+> but requires proportionally more GPU memory.
 
 **LIVE** vectorizes the raster emojis images (in original PNG format):
 

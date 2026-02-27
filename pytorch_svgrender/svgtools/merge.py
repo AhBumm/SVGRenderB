@@ -3,7 +3,7 @@
 # Description: SVGDreamer - merge
 # Copyright (c) 2023, XiMing Xing.
 # License: MIT License
-from typing import Tuple, AnyStr
+from typing import List, Tuple, AnyStr
 
 import omegaconf
 from svgpathtools import svg2paths, wsvg
@@ -238,3 +238,71 @@ def merge_two_svgs_edit(
     # write svg
     tree = ET.ElementTree(svg)
     tree.write(svg_out, encoding='utf-8', xml_declaration=True)
+
+
+# ---------------------------------------------------------------------------
+# Tiled SVG merge – compose per-tile SVG files into one full-resolution SVG
+# ---------------------------------------------------------------------------
+
+def merge_tile_svgs(
+        tile_svg_paths: List[AnyStr],
+        tile_origins: List[Tuple[int, int]],
+        out_svg_path: AnyStr,
+        canvas_w: int,
+        canvas_h: int,
+) -> None:
+    """Merge per-tile SVG files into a single full-resolution SVG.
+
+    Each tile's paths are wrapped in a ``<g transform="translate(x, y)">``
+    element so that the paths (which were optimised in tile-local coordinates)
+    are placed at the correct position in the full canvas.
+
+    Parameters
+    ----------
+    tile_svg_paths : list[str]
+        Ordered list of per-tile SVG file paths (same order as *tile_origins*).
+    tile_origins : list[tuple[int, int]]
+        ``(x_offset, y_offset)`` for each tile (pixel coordinates in the
+        full canvas).
+    out_svg_path : str
+        Destination SVG file.
+    canvas_w, canvas_h : int
+        Full canvas dimensions.
+    """
+    if len(tile_svg_paths) != len(tile_origins):
+        raise ValueError(
+            f"tile_svg_paths ({len(tile_svg_paths)}) and "
+            f"tile_origins ({len(tile_origins)}) must have the same length."
+        )
+
+    root = ET.Element(
+        'svg',
+        xmlns="http://www.w3.org/2000/svg",
+        version='1.1',
+        width=str(canvas_w),
+        height=str(canvas_h),
+    )
+
+    for svg_path, (tx, ty) in zip(tile_svg_paths, tile_origins):
+        tile_tree = ET.parse(svg_path)
+        tile_root = tile_tree.getroot()
+
+        group = ET.SubElement(root, 'g')
+        group.set('transform', f'translate({tx},{ty})')
+
+        # Copy all child elements from the tile SVG root into this group,
+        # stripping the SVG namespace prefix from tags.
+        for child in tile_root:
+            tag = child.tag.split('}')[-1] if '}' in child.tag else child.tag
+            if tag in ('defs',):
+                # Inline defs under the group (gradient ids may clash – left
+                # as-is for now; rename if your SVGs use gradient fills).
+                child.tag = tag
+                group.append(child)
+            elif tag in ('g', 'path', 'polygon', 'circle', 'ellipse', 'rect'):
+                child.tag = tag
+                group.append(child)
+
+    tree = ET.ElementTree(root)
+    ET.indent(tree, space='  ')
+    tree.write(out_svg_path, encoding='unicode', xml_declaration=False)

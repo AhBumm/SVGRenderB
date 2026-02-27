@@ -3,8 +3,6 @@
 # Description: the main func of this project.
 # Copyright (c) 2023, XiMing Xing.
 
-import os
-import sys
 from functools import partial
 
 from accelerate.utils import set_seed
@@ -12,33 +10,29 @@ import hydra
 import omegaconf
 
 from pytorch_svgrender.utils import render_batch_wrap, get_seed_range
+from pytorch_svgrender.pipelines.registry import available_methods, get_pipeline
 
-METHODS = [
-    'diffvg',
-    'live',
-    'vectorfusion',
-    'clipasso',
-    'clipascene',
-    'diffsketcher',
-    'stylediffsketcher',
-    'clipdraw',
-    'styleclipdraw',
-    'wordasimage',
-    'clipfont',
-    'svgdreamer'
-]
+# ---------------------------------------------------------------------------
+# METHODS is derived from the pipeline registry so that new pipelines
+# registered via registry.register_lazy appear here automatically.
+# ---------------------------------------------------------------------------
+METHODS = available_methods()
 
 
 @hydra.main(version_base=None, config_path="conf", config_name='config')
 def main(cfg: omegaconf.DictConfig):
     """
-    The project configuration is stored in './conf/config.yaml’
-    And method configurations are stored in './conf/x/’
+    The project configuration is stored in './conf/config.yaml'
+    And method configurations are stored in './conf/x/'
     """
 
     # print(omegaconf.OmegaConf.to_yaml(cfg))
     flag = cfg.x.method
-    assert flag in METHODS, f"{flag} is not currently supported!"
+    if flag not in METHODS:
+        raise ValueError(
+            f"'{flag}' is not currently supported! "
+            f"Available methods: {sorted(METHODS)}"
+        )
 
     # seed prepare
     set_seed(cfg.seed)
@@ -47,98 +41,90 @@ def main(cfg: omegaconf.DictConfig):
     # render function
     render_batch_fn = partial(render_batch_wrap, cfg=cfg, seed_range=seed_range)
 
-    if flag == "diffvg":  # img2svg
-        from pytorch_svgrender.pipelines.DiffVG_pipeline import DiffVGPipeline
-
-        pipe = DiffVGPipeline(cfg)
+    # -----------------------------------------------------------------------
+    # img2svg pipelines
+    # -----------------------------------------------------------------------
+    if flag == "diffvg":
+        pipe = get_pipeline("diffvg")(cfg)
         pipe.painterly_rendering(cfg.target)
 
-    elif flag == "live":  # img2svg
-        from pytorch_svgrender.pipelines.LIVE_pipeline import LIVEPipeline
-
-        pipe = LIVEPipeline(cfg)
+    elif flag == "diffvg_tile":  # img2svg (tiled high-resolution)
+        pipe = get_pipeline("diffvg_tile")(cfg)
         pipe.painterly_rendering(cfg.target)
 
-    elif flag == "vectorfusion":  # text2svg
-        from pytorch_svgrender.pipelines.VectorFusion_pipeline import VectorFusionPipeline
+    elif flag == "live":
+        pipe = get_pipeline("live")(cfg)
+        pipe.painterly_rendering(cfg.target)
 
+    # -----------------------------------------------------------------------
+    # text2svg pipelines
+    # -----------------------------------------------------------------------
+    elif flag == "vectorfusion":
         if not cfg.multirun:
-            pipe = VectorFusionPipeline(cfg)
+            pipe = get_pipeline("vectorfusion")(cfg)
             pipe.painterly_rendering(cfg.prompt)
-        else:  # generate many SVG at once
-            render_batch_fn(pipeline=VectorFusionPipeline, text_prompt=cfg.prompt)
+        else:
+            render_batch_fn(pipeline=get_pipeline("vectorfusion"), text_prompt=cfg.prompt)
 
-    elif flag == "svgdreamer":  # text2svg
-        from pytorch_svgrender.pipelines.SVGDreamer_pipeline import SVGDreamerPipeline
-
+    elif flag == "svgdreamer":
         if not cfg.multirun:
-            pipe = SVGDreamerPipeline(cfg)
+            pipe = get_pipeline("svgdreamer")(cfg)
             pipe.painterly_rendering(cfg.prompt)
-        else:  # generate many SVG at once
-            render_batch_fn(pipeline=SVGDreamerPipeline, text_prompt=cfg.prompt, target_file=None)
+        else:
+            render_batch_fn(pipeline=get_pipeline("svgdreamer"), text_prompt=cfg.prompt, target_file=None)
 
-    elif flag == "wordasimage":  # text2font
-        from pytorch_svgrender.pipelines.WordAsImage_pipeline import WordAsImagePipeline
-
-        pipe = WordAsImagePipeline(cfg)
+    elif flag == "wordasimage":
+        pipe = get_pipeline("wordasimage")(cfg)
         pipe.painterly_rendering(cfg.x.word, cfg.prompt, cfg.x.optim_letter)
 
-    elif flag == "clipasso":  # img2sketch
-        from pytorch_svgrender.pipelines.CLIPasso_pipeline import CLIPassoPipeline
-
-        pipe = CLIPassoPipeline(cfg)
+    # -----------------------------------------------------------------------
+    # img2sketch pipelines
+    # -----------------------------------------------------------------------
+    elif flag == "clipasso":
+        pipe = get_pipeline("clipasso")(cfg)
         pipe.painterly_rendering(cfg.target)
 
     elif flag == 'clipascene':
-        from pytorch_svgrender.pipelines.CLIPascene_pipeline import CLIPascenePipeline
-
-        pipe = CLIPascenePipeline(cfg)
+        pipe = get_pipeline("clipascene")(cfg)
         pipe.painterly_rendering(cfg.target)
 
-    elif flag == "clipdraw":  # text2svg
-        from pytorch_svgrender.pipelines.CLIPDraw_pipeline import CLIPDrawPipeline
-
+    # -----------------------------------------------------------------------
+    # text+img hybrid pipelines
+    # -----------------------------------------------------------------------
+    elif flag == "clipdraw":
         if not cfg.multirun:
-            pipe = CLIPDrawPipeline(cfg)
+            pipe = get_pipeline("clipdraw")(cfg)
             pipe.painterly_rendering(cfg.prompt)
-        else:  # generate many SVG at once
-            render_batch_fn(pipeline=CLIPDrawPipeline, prompt=cfg.prompt)
+        else:
+            render_batch_fn(pipeline=get_pipeline("clipdraw"), prompt=cfg.prompt)
 
-    elif flag == "clipfont":  # text and font to font
-        from pytorch_svgrender.pipelines.CLIPFont_pipeline import CLIPFontPipeline
-
+    elif flag == "clipfont":
         if not cfg.multirun:
-            pipe = CLIPFontPipeline(cfg)
+            pipe = get_pipeline("clipfont")(cfg)
             pipe.painterly_rendering(svg_path=cfg.target, prompt=cfg.prompt)
-        else:  # generate many SVG at once
-            render_batch_fn(pipeline=CLIPFontPipeline, svg_path=cfg.target, prompt=cfg.prompt)
+        else:
+            render_batch_fn(pipeline=get_pipeline("clipfont"), svg_path=cfg.target, prompt=cfg.prompt)
 
-    elif flag == "styleclipdraw":  # text to stylized svg
-        from pytorch_svgrender.pipelines.StyleCLIPDraw_pipeline import StyleCLIPDrawPipeline
-
+    elif flag == "styleclipdraw":
         if not cfg.multirun:
-            pipe = StyleCLIPDrawPipeline(cfg)
+            pipe = get_pipeline("styleclipdraw")(cfg)
             pipe.painterly_rendering(cfg.prompt, style_fpath=cfg.target)
-        else:  # generate many SVG at once
-            render_batch_fn(pipeline=StyleCLIPDrawPipeline, prompt=cfg.prompt, style_fpath=cfg.target)
+        else:
+            render_batch_fn(pipeline=get_pipeline("styleclipdraw"), prompt=cfg.prompt, style_fpath=cfg.target)
 
-    elif flag == "diffsketcher":  # text2sketch
-        from pytorch_svgrender.pipelines.DiffSketcher_pipeline import DiffSketcherPipeline
-
+    elif flag == "diffsketcher":
         if not cfg.multirun:
-            pipe = DiffSketcherPipeline(cfg)
+            pipe = get_pipeline("diffsketcher")(cfg)
             pipe.painterly_rendering(cfg.prompt)
-        else:  # generate many SVG at once
-            render_batch_fn(pipeline=DiffSketcherPipeline, prompt=cfg.prompt)
+        else:
+            render_batch_fn(pipeline=get_pipeline("diffsketcher"), prompt=cfg.prompt)
 
-    elif flag == "stylediffsketcher":  # text2sketch + style transfer
-        from pytorch_svgrender.pipelines.DiffSketcher_stylized_pipeline import StylizedDiffSketcherPipeline
-
+    elif flag == "stylediffsketcher":
         if not cfg.multirun:
-            pipe = StylizedDiffSketcherPipeline(cfg)
+            pipe = get_pipeline("stylediffsketcher")(cfg)
             pipe.painterly_rendering(cfg.prompt, style_fpath=cfg.target)
-        else:  # generate many SVG at once
-            render_batch_fn(pipeline=StylizedDiffSketcherPipeline, prompt=cfg.prompt, style_fpath=cfg.style_file)
+        else:
+            render_batch_fn(pipeline=get_pipeline("stylediffsketcher"), prompt=cfg.prompt, style_fpath=cfg.style_file)
 
 
 if __name__ == '__main__':

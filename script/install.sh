@@ -1,58 +1,91 @@
 #!/bin/bash
+# Installation script for PyTorch-SVGRender
+# Target: Python 3.10 + PyTorch 2.8 + CUDA 12.8
+#
+# Usage:
+#   bash script/install.sh              # base install (no diffvg)
+#   INSTALL_DIFFVG=1 bash script/install.sh  # also compile & install diffvg
+#   INSTALL_XFORMERS=1 bash script/install.sh  # also install xformers
 
 set -e
 
-# Conda setup and environment creation
+# ---------------------------------------------------------------------------
+# 1. Create conda environment (Python 3.10)
+# ---------------------------------------------------------------------------
 eval "$(conda shell.bash hook)"
 
 conda create --name svgrender python=3.10 --yes
 conda activate svgrender
-echo "The conda environment was successfully created"
+echo "Conda environment 'svgrender' created with Python 3.10."
 
-# Install PyTorch and related libraries
-conda install pytorch==1.12.1 torchvision==0.13.1 torchaudio==0.12.1 cudatoolkit=11.3 -c pytorch --yes
-echo "Pytorch installation is complete. version: 1.12.1"
+# ---------------------------------------------------------------------------
+# 2. Install PyTorch 2.8 + CUDA 12.8 via official pip wheel
+#    See: https://pytorch.org/get-started/locally/
+# ---------------------------------------------------------------------------
+pip install torch torchvision torchaudio --index-url https://download.pytorch.org/whl/cu128
+echo "PyTorch (torch 2.8, cu128) installation complete."
 
-# Install xformers
-conda install xformers -c xformers --yes
-echo "xformers installation is complete."
+# ---------------------------------------------------------------------------
+# 3. (Optional) xformers – recommended for Stable Diffusion pipelines.
+#    Install only when INSTALL_XFORMERS=1 to avoid hard-failure on machines
+#    where the compatible wheel is unavailable.
+# ---------------------------------------------------------------------------
+if [ "${INSTALL_XFORMERS:-0}" = "1" ]; then
+    pip install xformers || echo "Warning: xformers install failed – continuing without it."
+    echo "xformers installation attempt done."
+fi
 
-# Install common Python dependencies
+# ---------------------------------------------------------------------------
+# 4. Base Python dependencies
+# ---------------------------------------------------------------------------
 pip install hydra-core omegaconf
 pip install freetype-py shapely svgutils cairosvg
-pip install opencv-python scikit-image matplotlib visdom wandb BeautifulSoup4
-pip install triton numba
-pip install numpy scipy scikit-fmm einops timm fairscale==0.4.13
-pip install accelerate transformers safetensors datasets
-pip install easydict scikit-learn pytorch_lightning==2.1.0 webdataset
-echo "The basic dependency library is installed."
-
-# Additional utility libraries
+pip install "opencv-python>=4.8" scikit-image matplotlib wandb beautifulsoup4
+pip install "numpy>=1.24,<2" scipy scikit-fmm einops timm
+pip install "accelerate>=0.28" "transformers>=4.38" safetensors datasets
+pip install easydict scikit-learn "pytorch_lightning>=2.1" webdataset
 pip install ftfy regex tqdm
-pip install git+https://github.com/openai/CLIP.git
-echo "CLIP installation is complete."
-
-# Install diffusers
-pip install diffusers==0.20.2
-echo "Diffusers installation is complete. version: 0.20.2"
-
-# Clone and set up DiffVG, handling dependencies on Ubuntu
-git clone https://github.com/BachiLi/diffvg.git
-cd diffvg
-git submodule update --init --recursive
-
-# Install system dependencies for Ubuntu (to avoid potential issues)
-echo "Installing system dependencies for DiffVG..."
-sudo apt update
-sudo apt install -y cmake ffmpeg build-essential libjpeg-dev libpng-dev libtiff-dev
-
-conda install -y -c anaconda cmake
-conda install -y -c conda-forge ffmpeg
 pip install svgwrite svgpathtools cssutils torch-tools
+echo "Base Python dependencies installed."
 
-# Install DiffVG
-python setup.py install
-echo "DiffVG installation is complete."
+# ---------------------------------------------------------------------------
+# 5. Generative-model pipeline dependencies (optional but recommended)
+# ---------------------------------------------------------------------------
+pip install "diffusers>=0.28"
+pip install git+https://github.com/openai/CLIP.git || echo "Warning: CLIP install failed."
+echo "Generative pipeline dependencies installed."
 
+# ---------------------------------------------------------------------------
+# 6. (Optional) diffvg – requires CUDA toolkit headers and cmake.
+#    Set INSTALL_DIFFVG=1 to enable. Common failure cause: CUDA header mismatch.
+#    If compilation fails see: https://github.com/BachiLi/diffvg#installation
+# ---------------------------------------------------------------------------
+if [ "${INSTALL_DIFFVG:-0}" = "1" ]; then
+    echo "Installing DiffVG (this may take several minutes)..."
+
+    # System-level build tools (Ubuntu/Debian)
+    sudo apt-get update -qq
+    sudo apt-get install -y cmake ffmpeg build-essential libjpeg-dev libpng-dev libtiff-dev
+
+    if [ ! -d "diffvg" ]; then
+        git clone https://github.com/BachiLi/diffvg.git
+    fi
+    cd diffvg
+    git submodule update --init --recursive
+    pip install .
+    cd ..
+    echo "DiffVG installation complete."
+else
+    echo "Skipping DiffVG (set INSTALL_DIFFVG=1 to install)."
+    echo "After installing DiffVG manually, the 'diffvg' and 'diffvg_tile' methods will be available."
+fi
+
+# ---------------------------------------------------------------------------
 # Final confirmation
-echo "The running environment has been successfully installed!!!"
+# ---------------------------------------------------------------------------
+echo ""
+echo "========================================================"
+echo " PyTorch-SVGRender environment installed successfully!"
+echo " To also install diffvg:  INSTALL_DIFFVG=1 bash script/install.sh"
+echo " To also install xformers: INSTALL_XFORMERS=1 bash script/install.sh"
+echo "========================================================"
