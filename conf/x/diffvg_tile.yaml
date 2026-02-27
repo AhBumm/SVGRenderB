@@ -1,0 +1,28 @@
+method: 'diffvg_tile'
+
+# Tiling parameters
+tile_size: 512        # width and height of each tile in pixels
+overlap: 64           # overlap between adjacent tiles in pixels (stride = tile_size - overlap)
+batch_size: 4         # number of tiles to process per micro-batch step
+feather: 32           # feather/blend width at tile edges (pixels); set to 0 to disable
+
+# train
+num_iter: 500         # optimisation iterations per tile
+lr_base:
+  point: 1
+  color: 0.01
+  stroke_width: 0.1
+  stroke_color: 0.01
+lr_schedule: False    # use lr_schedule
+
+# SVG path attributes
+num_paths: 128        # number of paths per tile
+max_width: 5.0        # maximum stroke width
+path_type: 'unclosed' # 'unclosed' or 'closed'
+
+# loss
+loss_type: 'l2'       # 'l1', 'l2', 'lpips', or 'l2+lpips'
+perceptual:
+  lpips_net: 'vgg'    # used only when loss_type contains 'lpips'
+l2_weight: 1.0        # weight for l2 loss component
+lpips_weight: 1.0     # weight for lpips loss component (used with l2+lpips)

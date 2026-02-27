@@ -15,6 +15,7 @@ from pytorch_svgrender.utils import render_batch_wrap, get_seed_range
 
 METHODS = [
     'diffvg',
+    'diffvg_tile',
     'live',
     'vectorfusion',
     'clipasso',
@@ -51,6 +52,12 @@ def main(cfg: omegaconf.DictConfig):
         from pytorch_svgrender.pipelines.DiffVG_pipeline import DiffVGPipeline
 
         pipe = DiffVGPipeline(cfg)
+        pipe.painterly_rendering(cfg.target)
+
+    elif flag == "diffvg_tile":  # tiled img2svg for high-resolution images
+        from pytorch_svgrender.pipelines.DiffVGTile_pipeline import DiffVGTilePipeline
+
+        pipe = DiffVGTilePipeline(cfg)
         pipe.painterly_rendering(cfg.target)
 
     elif flag == "live":  # img2svg
