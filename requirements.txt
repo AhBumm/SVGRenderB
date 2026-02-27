@@ -1,0 +1,72 @@
+# =============================================================================
+# PyTorch-SVGRender – Python 3.10 | PyTorch 2.8 | CUDA 12.8
+# =============================================================================
+#
+# STEP 0 – Install PyTorch (NOT listed here to avoid index-url conflicts):
+#   pip install torch torchvision torchaudio \
+#       --index-url https://download.pytorch.org/whl/cu128
+#
+# STEP 1 – Install base dependencies:
+#   pip install -r requirements.txt
+#
+# STEP 2 (optional) – Install pydiffvg (requires CUDA build tools):
+#   git clone https://github.com/BachiLi/diffvg.git
+#   cd diffvg && git submodule update --init --recursive && pip install . && cd ..
+#
+# STEP 3 (optional) – Install xformers (must match installed torch version):
+#   pip install xformers
+#
+# =============================================================================
+
+# --- Configuration / experiment management ---
+hydra-core>=1.3
+omegaconf>=2.3
+
+# --- Acceleration / distributed training ---
+accelerate>=0.28
+
+# --- Image processing ---
+Pillow>=9.0
+opencv-python>=4.8
+scikit-image>=0.21
+
+# --- SVG utilities ---
+svgwrite
+svgpathtools
+cairosvg
+svgutils
+cssutils
+freetype-py
+shapely
+
+# --- Numerical / ML utilities ---
+numpy>=1.24,<2
+scipy
+scikit-fmm
+einops
+timm
+tqdm
+ftfy
+regex
+easydict
+scikit-learn
+matplotlib
+wandb
+beautifulsoup4
+webdataset
+torch-tools
+
+# --- HuggingFace stack ---
+transformers>=4.38
+safetensors
+datasets
+diffusers>=0.28
+pytorch_lightning>=2.1
+
+# =============================================================================
+# Optional / separate install (not listed above to avoid hard failures)
+# =============================================================================
+# pydiffvg        -- build from source: https://github.com/BachiLi/diffvg
+# xformers        -- pip install xformers  (must match torch version)
+# triton          -- pip install triton     (Linux only)
+# CLIP            -- pip install git+https://github.com/openai/CLIP.git
